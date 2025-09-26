@@ -128,12 +128,13 @@ public class Steam {
         rplayer.writeBoolean(true);
     }
 
-    public void downloadGame(int gameCode, int clientCode, char sistemaOperativo) throws IOException {
+    public boolean downloadGame(int gameCode, int clientCode, char sistemaOperativo) throws IOException {
         rgames.seek(0);
         boolean gCodeExists = false;
         char os = 'n';
         int edadMinima = 0;
         long nacimiento = 0;
+        double precio = 0;
         String username = "";
         String title = "";
         String path = "";
@@ -144,7 +145,7 @@ public class Steam {
             rgames.readUTF();
             char tmpos = rgames.readChar();
             int tmpedadMinima = rgames.readInt();
-            rgames.readDouble();
+            double tmpPrecio = rgames.readDouble();
             rgames.readInt();
             String tmpPath = rgames.readUTF();
 
@@ -154,6 +155,7 @@ public class Steam {
                 edadMinima = tmpedadMinima;
                 title = tmpTitle;
                 path = tmpPath;
+                precio = tmpPrecio;
             }
         }
 
@@ -188,7 +190,7 @@ public class Steam {
         if (hoy.get(Calendar.DAY_OF_YEAR) < cal.get(Calendar.DAY_OF_YEAR)) {
             edad--;
         }
-        
+
         /*
         Formato download_codigodownload.stm
         int downloadCode;
@@ -197,20 +199,25 @@ public class Steam {
         int gameCode;
         String gameName;
         Image gameImage;
+        Double gamePrice;
         long fechaDownload;
-        */
-
+         */
         if (gCodeExists == true && cCodeExists == true && os == sistemaOperativo && edad >= edadMinima) {
             int downloadCode = getCode(3);
             RandomAccessFile rdownloads = new RandomAccessFile("steam/downloads/download_" + downloadCode + ".stm", "rw");
-            
+
             rdownloads.writeInt(downloadCode);
             rdownloads.writeInt(clientCode);
             rdownloads.writeUTF(username);
             rdownloads.writeInt(gameCode);
             rdownloads.writeUTF(title);
             rdownloads.writeUTF(path);
+            rdownloads.writeDouble(precio);
             rdownloads.writeLong(Calendar.getInstance().getTimeInMillis());
+
+            return true;
+        } else {
+            return false;
         }
     }
 

@@ -138,9 +138,13 @@ public class Steam {
         String username = "";
         String title = "";
         String path = "";
+        long posClient = 0;
+        long posGame = 0;
+        boolean activo = false;
 
         while (rgames.getFilePointer() < rgames.length()) {
             int tmpCode = rgames.readInt();
+            long tmpPosGame = rgames.getFilePointer();
             String tmpTitle = rgames.readUTF();
             rgames.readUTF();
             char tmpos = rgames.readChar();
@@ -156,6 +160,7 @@ public class Steam {
                 title = tmpTitle;
                 path = tmpPath;
                 precio = tmpPrecio;
+                posGame = tmpPosGame;
             }
         }
 
@@ -164,6 +169,7 @@ public class Steam {
 
         while (rplayer.getFilePointer() < rplayer.length()) {
             int tmpCode = rplayer.readInt();
+            long tmpPosClient = rplayer.getFilePointer();
             String usernameTmp = rplayer.readUTF();
             rplayer.readUTF();
             rplayer.readUTF();
@@ -171,12 +177,14 @@ public class Steam {
             rplayer.readInt();
             rplayer.readUTF();
             rplayer.readUTF();
-            rplayer.readBoolean();
+            boolean tmpActivo = rplayer.readBoolean();
 
             if (tmpCode == clientCode) {
                 cCodeExists = true;
                 nacimiento = tmpNacimiento;
                 username = usernameTmp;
+                activo = tmpActivo;
+                posClient = tmpPosClient;
             }
         }
 
@@ -202,7 +210,7 @@ public class Steam {
         Double gamePrice;
         long fechaDownload;
          */
-        if (gCodeExists == true && cCodeExists == true && os == sistemaOperativo && edad >= edadMinima) {
+        if (activo == true && gCodeExists == true && cCodeExists == true && os == sistemaOperativo && edad >= edadMinima) {
             int downloadCode = getCode(3);
             RandomAccessFile rdownloads = new RandomAccessFile("steam/downloads/download_" + downloadCode + ".stm", "rw");
 
@@ -215,10 +223,60 @@ public class Steam {
             rdownloads.writeDouble(precio);
             rdownloads.writeLong(Calendar.getInstance().getTimeInMillis());
 
+            rgames.seek(posGame);
+            rgames.readUTF();
+            rgames.readUTF();
+            rgames.readChar();
+            rgames.readInt();
+            rgames.readDouble();
+            long posDG = rgames.getFilePointer();
+            int cdownloads = rgames.readInt();
+            rgames.seek(posDG);
+            rgames.writeInt(cdownloads + 1);
+
+            rplayer.seek(posClient);
+            rplayer.readUTF();
+            rplayer.readUTF();
+            rplayer.readUTF();
+            rplayer.readLong();
+            long posDP = rplayer.getFilePointer();
+            int cdownloadsp = rplayer.readInt();
+            rplayer.seek(posDP);
+            rplayer.writeInt(cdownloadsp + 1);
+
             return true;
         } else {
             return false;
         }
+    }
+
+    public String login(String username, String password) throws IOException {
+        rplayer.seek(0);
+        while (rplayer.getFilePointer() < rplayer.length()) {
+            long startPosition = rplayer.getFilePointer();
+
+            rplayer.readInt();
+            String fileUsername = readFixedString(rplayer, USERNAME_LENGTH);
+            String filePassword = readFixedString(rplayer, PASSWORD_LENGTH);
+
+            if (fileUsername.equals(username) && filePassword.equals(password)) {
+                readFixedString(rplayer, FULL_NAME_LENGTH);
+                rplayer.readLong();
+                rplayer.readInt();
+                readFixedString(rplayer, PLAYER_IMG_PATH_LENGTH);
+                String userType = readFixedString(rplayer, USER_TYPE_LENGTH);
+                boolean isActive = rplayer.readBoolean();
+
+                if (isActive) {
+                    return userType;
+                } else {
+                    return "INACTIVE";
+                }
+            }
+
+            rplayer.seek(startPosition + PLAYER_RECORD_SIZE);
+        }
+        return null;
     }
 
     public static Steam getINSTANCE() {

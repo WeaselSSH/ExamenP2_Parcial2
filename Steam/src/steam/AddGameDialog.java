@@ -1,16 +1,9 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package steam;
 import javax.swing.*;
 import java.awt.*;
+import java.io.File;
 import java.io.IOException;
-
-/**
- *
- * @author saidn
- */
+import javax.swing.filechooser.FileNameExtensionFilter;
 
 public class AddGameDialog extends JDialog {
 
@@ -20,6 +13,7 @@ public class AddGameDialog extends JDialog {
     private JTextField ageField = new JTextField();
     private JTextField priceField = new JTextField();
     private JTextField photoField = new JTextField();
+    private JButton selectPhotoButton = new JButton("Seleccionar...");
 
     public AddGameDialog(JFrame parent) {
         super(parent, "Anadir Nuevo Juego", true);
@@ -39,8 +33,14 @@ public class AddGameDialog extends JDialog {
         formPanel.add(ageField);
         formPanel.add(new JLabel("Precio:"));
         formPanel.add(priceField);
-        formPanel.add(new JLabel("Ruta de Foto:"));
-        formPanel.add(photoField);
+        formPanel.add(new JLabel("Foto del Juego:"));
+
+        JPanel photoSelectorPanel = new JPanel(new BorderLayout(5, 0));
+        photoField.setEditable(false); 
+        photoSelectorPanel.add(photoField, BorderLayout.CENTER);
+        photoSelectorPanel.add(selectPhotoButton, BorderLayout.EAST);
+        formPanel.add(photoSelectorPanel);
+        
         add(formPanel, BorderLayout.CENTER);
 
         JPanel buttonPanel = new JPanel();
@@ -52,6 +52,19 @@ public class AddGameDialog extends JDialog {
 
         addButton.addActionListener(e -> addGame());
         cancelButton.addActionListener(e -> dispose());
+        selectPhotoButton.addActionListener(e -> selectPhoto());
+    }
+    
+    private void selectPhoto() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Seleccione una imagen para el juego");
+        FileNameExtensionFilter filter = new FileNameExtensionFilter("Imagenes (JPG, PNG, GIF)", "jpg", "png", "gif");
+        fileChooser.setFileFilter(filter);
+        int result = fileChooser.showOpenDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            File selectedFile = fileChooser.getSelectedFile();
+            photoField.setText(selectedFile.getAbsolutePath());
+        }
     }
 
     private void addGame() {
@@ -68,8 +81,8 @@ public class AddGameDialog extends JDialog {
             double precio = Double.parseDouble(priceField.getText());
             String fotoPath = photoField.getText();
 
-            if (titulo.isEmpty() || genero.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Titulo y Genero no pueden estar vacios.", "Error",
+            if (titulo.isEmpty() || genero.isEmpty() || fotoPath.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Todos los campos son obligatorios.", "Error",
                         JOptionPane.ERROR_MESSAGE);
                 return;
             }

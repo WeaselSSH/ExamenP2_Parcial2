@@ -45,6 +45,10 @@ public class RegisterFrame extends JFrame {
         JLabel birthLabel = new JLabel("Fecha Nacimiento:");
         birthDateChooser = new JDateChooser();
         birthDateChooser.setDateFormatString("yyyy-MM-dd");
+
+        birthDateChooser.getJCalendar().setWeekOfYearVisible(false);
+        birthDateChooser.setMaxSelectableDate(new Date());
+        
         JLabel photoLabel = new JLabel("Foto de Perfil:");
         JPanel photoSelectorPanel = new JPanel(new BorderLayout(5, 0));
         photoPathField = new JTextField();
@@ -117,6 +121,25 @@ public class RegisterFrame extends JFrame {
         });
     }
 
+    private boolean isPasswordValid(String password) {
+        if (password.length() < 8) {
+            return false;
+        }
+        boolean hasUpper = false;
+        boolean hasLower = false;
+        boolean hasSymbol = false;
+        for (char c : password.toCharArray()) {
+            if (Character.isUpperCase(c)) {
+                hasUpper = true;
+            } else if (Character.isLowerCase(c)) {
+                hasLower = true;
+            } else if (!Character.isLetterOrDigit(c)) {
+                hasSymbol = true;
+            }
+        }
+        return hasUpper && hasLower && hasSymbol;
+    }
+
     private void registerUser() {
         try {
             String username = userText.getText();
@@ -133,6 +156,11 @@ public class RegisterFrame extends JFrame {
             if (birthDate == null) {
                 JOptionPane.showMessageDialog(this, "Por favor, seleccione una fecha de nacimiento.", "Fecha Faltante", JOptionPane.WARNING_MESSAGE);
                 return;
+            }
+
+            if (!isPasswordValid(password)) {
+                JOptionPane.showMessageDialog(this, "La contrasena debe tener al menos 8 caracteres, una mayuscula, una minuscula y un simbolo.", "Contrasena Invalida", JOptionPane.WARNING_MESSAGE);
+                return; 
             }
 
             long birthMillis = birthDate.getTime();

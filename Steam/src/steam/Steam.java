@@ -291,8 +291,10 @@ public class Steam {
         }
         return false;
     }
-    
-     public record Player(int code, String username, String password, String fullName, long birthDate, int downloads, String photoPath, String userType, boolean isActive) {}
+
+    public record Player(int code, String username, String password, String fullName, long birthDate, int downloads, String photoPath, String userType, boolean isActive) {
+
+    }
 
     public Player getPlayerByUsername(String username) throws IOException {
         rplayer.seek(0);
@@ -312,7 +314,6 @@ public class Steam {
         }
         return null;
     }
-
 
     public static Steam getINSTANCE() {
         return INSTANCE;

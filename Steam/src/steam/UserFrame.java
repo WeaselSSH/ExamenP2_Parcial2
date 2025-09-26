@@ -13,7 +13,7 @@ import java.awt.*;
 
 public class UserFrame extends JFrame {
 
-    public UserFrame() {
+    public UserFrame(Steam steam, LoginFrame loginFrame) {
         setTitle("Bienvenido a Steam");
         setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);

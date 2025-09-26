@@ -14,6 +14,6 @@ public class Main {
         RegisterFrame reg = new RegisterFrame();
         LoginFrame log = new LoginFrame();
         
-        log.setVisible(true);
+        reg.setVisible(true);
     }
 }

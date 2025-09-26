@@ -3,6 +3,8 @@ package steam;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.util.Calendar;
+import java.util.Date;
 
 public class Steam {
 
@@ -95,6 +97,7 @@ public class Steam {
         rgames.writeChar(os);
         rgames.writeInt(edadMinima);
         rgames.writeDouble(precio);
+        rgames.writeInt(0);
         rgames.writeUTF(path);
     }
 
@@ -125,8 +128,90 @@ public class Steam {
         rplayer.writeBoolean(true);
     }
 
-    public void downloadGame(int gameCode, int clientCode, char sistemaOperativo) {
+    public void downloadGame(int gameCode, int clientCode, char sistemaOperativo) throws IOException {
+        rgames.seek(0);
+        boolean gCodeExists = false;
+        char os = 'n';
+        int edadMinima = 0;
+        long nacimiento = 0;
+        String username = "";
+        String title = "";
+        String path = "";
 
+        while (rgames.getFilePointer() < rgames.length()) {
+            int tmpCode = rgames.readInt();
+            String tmpTitle = rgames.readUTF();
+            rgames.readUTF();
+            char tmpos = rgames.readChar();
+            int tmpedadMinima = rgames.readInt();
+            rgames.readDouble();
+            rgames.readInt();
+            String tmpPath = rgames.readUTF();
+
+            if (tmpCode == gameCode) {
+                gCodeExists = true;
+                os = tmpos;
+                edadMinima = tmpedadMinima;
+                title = tmpTitle;
+                path = tmpPath;
+            }
+        }
+
+        rplayer.seek(0);
+        boolean cCodeExists = false;
+
+        while (rplayer.getFilePointer() < rplayer.length()) {
+            int tmpCode = rplayer.readInt();
+            String usernameTmp = rplayer.readUTF();
+            rplayer.readUTF();
+            rplayer.readUTF();
+            long tmpNacimiento = rplayer.readLong();
+            rplayer.readInt();
+            rplayer.readUTF();
+            rplayer.readUTF();
+            rplayer.readBoolean();
+
+            if (tmpCode == clientCode) {
+                cCodeExists = true;
+                nacimiento = tmpNacimiento;
+                username = usernameTmp;
+            }
+        }
+
+        Date edadJugador = new Date(nacimiento);
+
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(edadJugador);
+        Calendar hoy = Calendar.getInstance();
+
+        int edad = hoy.get(Calendar.YEAR) - cal.get(Calendar.YEAR);
+        if (hoy.get(Calendar.DAY_OF_YEAR) < cal.get(Calendar.DAY_OF_YEAR)) {
+            edad--;
+        }
+        
+        /*
+        Formato download_codigodownload.stm
+        int downloadCode;
+        int playerCode;
+        String playerName;
+        int gameCode;
+        String gameName;
+        Image gameImage;
+        long fechaDownload;
+        */
+
+        if (gCodeExists == true && cCodeExists == true && os == sistemaOperativo && edad >= edadMinima) {
+            int downloadCode = getCode(3);
+            RandomAccessFile rdownloads = new RandomAccessFile("steam/downloads/download_" + downloadCode + ".stm", "rw");
+            
+            rdownloads.writeInt(downloadCode);
+            rdownloads.writeInt(clientCode);
+            rdownloads.writeUTF(username);
+            rdownloads.writeInt(gameCode);
+            rdownloads.writeUTF(title);
+            rdownloads.writeUTF(path);
+            rdownloads.writeLong(Calendar.getInstance().getTimeInMillis());
+        }
     }
 
     public static Steam getINSTANCE() {

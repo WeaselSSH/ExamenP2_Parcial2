@@ -253,30 +253,21 @@ public class Steam {
     public String login(String username, String password) throws IOException {
         rplayer.seek(0);
         while (rplayer.getFilePointer() < rplayer.length()) {
-            long startPosition = rplayer.getFilePointer();
-
-            rplayer.readInt();
-            String fileUsername = readFixedString(rplayer, USERNAME_LENGTH);
-            String filePassword = readFixedString(rplayer, PASSWORD_LENGTH);
+            int code = rplayer.readInt();
+            String fileUsername = rplayer.readUTF();
+            String filePassword = rplayer.readUTF();
+            String nombre = rplayer.readUTF();
+            long nacimiento = rplayer.readLong();
+            int contDescargas = rplayer.readInt();
+            String imgPath = rplayer.readUTF();
+            String tipoUsuario = rplayer.readUTF();   // "ADMIN" | "NORMAL"
+            boolean estado = rplayer.readBoolean();
 
             if (fileUsername.equals(username) && filePassword.equals(password)) {
-                readFixedString(rplayer, FULL_NAME_LENGTH);
-                rplayer.readLong();
-                rplayer.readInt();
-                readFixedString(rplayer, PLAYER_IMG_PATH_LENGTH);
-                String userType = readFixedString(rplayer, USER_TYPE_LENGTH);
-                boolean isActive = rplayer.readBoolean();
-
-                if (isActive) {
-                    return userType;
-                } else {
-                    return "INACTIVE";
-                }
+                return estado ? tipoUsuario : "INACTIVE";
             }
-
-            rplayer.seek(startPosition + PLAYER_RECORD_SIZE);
         }
-        return null;
+        return null; // no coincide
     }
 
     public static Steam getINSTANCE() {

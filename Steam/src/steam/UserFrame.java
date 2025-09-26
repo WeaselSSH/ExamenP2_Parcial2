@@ -1,38 +1,15 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package steam;
 
-import java.awt.BorderLayout;
-import java.awt.CardLayout;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.GridBagLayout;
-import java.awt.GridLayout;
-import java.awt.Image;
+import javax.imageio.ImageIO;
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import javax.imageio.ImageIO;
-import javax.swing.BorderFactory;
-import javax.swing.ImageIcon;
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JMenu;
-import javax.swing.JMenuBar;
-import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.SwingConstants;
 
-/**
- *
- * @author saidn
- */
 public class UserFrame extends JFrame {
     
     private LoginFrame loginFrame;
@@ -40,6 +17,8 @@ public class UserFrame extends JFrame {
     private int loggedInUserCode;
     private JPanel mainPanel;
     private CardLayout cardLayout;
+    private JTable gamesTable;
+    private DefaultTableModel gamesModel;
 
     public UserFrame(LoginFrame loginFrame, String username) {
         this.loginFrame = loginFrame;
@@ -79,7 +58,10 @@ public class UserFrame extends JFrame {
         menuBar.add(systemMenu);
         setJMenuBar(menuBar);
 
-        viewCatalogItem.addActionListener(e -> showCatalogPanel());
+        viewCatalogItem.addActionListener(e -> {
+            refreshGamesTable();
+            cardLayout.show(mainPanel, "CATALOG");
+        });
         viewProfileItem.addActionListener(e -> showProfilePanel());
         logoutItem.addActionListener(e -> {
             this.dispose();
@@ -93,6 +75,7 @@ public class UserFrame extends JFrame {
         JPanel welcomePanel = new JPanel(new GridBagLayout());
         welcomePanel.add(new JLabel("Bienvenido. Explora el catalogo o revisa tu perfil."));
         mainPanel.add(welcomePanel, "WELCOME");
+        mainPanel.add(createCatalogPanel(), "CATALOG");
         add(mainPanel);
     }
 
@@ -156,7 +139,73 @@ public class UserFrame extends JFrame {
         return profilePanel;
     }
     
-    private void showCatalogPanel() {
-        JOptionPane.showMessageDialog(this, "Funcionalidad no disponible: Steam.java no tiene un metodo para listar todos los juegos.");
+    private JPanel createCatalogPanel() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        String[] gameColumns = { "Codigo", "Titulo", "Genero", "SO", "Edad Min", "Precio", "Downloads" };
+        gamesModel = new DefaultTableModel(gameColumns, 0){
+            @Override
+            public boolean isCellEditable(int row, int column) { return false; }
+        };
+        gamesTable = new JTable(gamesModel);
+        panel.add(new JScrollPane(gamesTable), BorderLayout.CENTER);
+
+        JPanel controlPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+        JButton backButton = new JButton("Retroceder al Menu");
+        JButton downloadButton = new JButton("Descargar Juego Seleccionado");
+        controlPanel.add(backButton);
+        controlPanel.add(downloadButton);
+        panel.add(controlPanel, BorderLayout.SOUTH);
+
+        backButton.addActionListener(e -> cardLayout.show(mainPanel, "WELCOME"));
+        downloadButton.addActionListener(e -> downloadGame());
+
+        return panel;
+    }
+
+    private void refreshGamesTable() {
+        gamesModel.setRowCount(0);
+        try {
+            GameNode current = Steam.getINSTANCE().printGames();
+            while (current != null) {
+                String os = "";
+                switch (current.so) {
+                    case 'W': os = "Windows"; break;
+                    case 'M': os = "Mac"; break;
+                    case 'L': os = "Linux"; break;
+                }
+                gamesModel.addRow(new Object[]{current.code, current.titulo, current.genero, os, current.edadMin, String.format("%.2f", current.precio), current.dls});
+                current = current.next;
+            }
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, "Error al cargar juegos: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private void downloadGame(){
+        int selectedRow = gamesTable.getSelectedRow();
+        if(selectedRow == -1){
+            JOptionPane.showMessageDialog(this, "Por favor, seleccione un juego de la tabla para descargar.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int gameCode = (int) gamesModel.getValueAt(selectedRow, 0);
+        String[] osOptions = {"Windows", "Mac", "Linux"};
+        String osChoice = (String) JOptionPane.showInputDialog(this, "Seleccione su sistema operativo:", "Confirmar Descarga", JOptionPane.QUESTION_MESSAGE, null, osOptions, osOptions[0]);
+
+        if(osChoice != null){
+            try {
+                char os = osChoice.charAt(0);
+                boolean success = Steam.getINSTANCE().downloadGame(gameCode, loggedInUserCode, os);
+                if(success){
+                    JOptionPane.showMessageDialog(this, "Descarga completada! El juego ha sido anadido a tu biblioteca.", "Exito", JOptionPane.INFORMATION_MESSAGE);
+                    refreshGamesTable();
+                } else {
+                    JOptionPane.showMessageDialog(this, "No se pudo realizar la descarga. Verifique la compatibilidad de SO y la edad minima requerida.", "Descarga Fallida", JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(this, "Error de archivo durante la descarga: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
     }
 }

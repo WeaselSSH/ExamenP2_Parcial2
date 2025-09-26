@@ -1,17 +1,9 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package steam;
 
 import javax.swing.*;
 import java.awt.*;
 import java.io.IOException;
 
-/**
- *
- * @author saidn
- */
 public class LoginFrame extends JFrame {
 
     private JTextField userText;
@@ -19,26 +11,49 @@ public class LoginFrame extends JFrame {
 
     public LoginFrame() {
         setTitle("Steam Login");
-        setSize(400, 200);
+        setSize(400, 220);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
+        setResizable(false);
 
-        JPanel panel = new JPanel(new GridLayout(3, 2, 10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
 
         JLabel userLabel = new JLabel("Username:");
-        userText = new JTextField();
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        panel.add(userLabel, gbc);
+
+        userText = new JTextField(15);
+        gbc.gridx = 1;
+        gbc.gridy = 0;
+        panel.add(userText, gbc);
+
         JLabel passwordLabel = new JLabel("Password:");
-        passwordText = new JPasswordField();
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        panel.add(passwordLabel, gbc);
+
+        passwordText = new JPasswordField(15);
+        gbc.gridx = 1;
+        gbc.gridy = 1;
+        panel.add(passwordText, gbc);
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
         JButton loginButton = new JButton("Entrar");
         JButton registerButton = new JButton("Registrar Usuario");
+        buttonPanel.add(loginButton);
+        buttonPanel.add(registerButton);
 
-        panel.add(userLabel);
-        panel.add(userText);
-        panel.add(passwordLabel);
-        panel.add(passwordText);
-        panel.add(loginButton);
-        panel.add(registerButton);
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.gridwidth = 2;
+        gbc.insets = new Insets(15, 5, 5, 5);
+        gbc.anchor = GridBagConstraints.CENTER;
+        panel.add(buttonPanel, gbc);
 
         add(panel);
 
@@ -71,7 +86,7 @@ public class LoginFrame extends JFrame {
                         this.dispose();
                         break;
                     case "NORMAL":
-                        UserFrame userWindow = new UserFrame(this);
+                        UserFrame userWindow = new UserFrame(this, username);
                         userWindow.setVisible(true);
                         this.dispose();
                         break;

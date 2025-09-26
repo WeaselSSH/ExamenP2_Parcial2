@@ -1,16 +1,10 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package steam;
+
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.io.IOException;
-/**
- *
- * @author saidn
- */
+
 public class AdminFrame extends JFrame {
     
     private LoginFrame loginFrame;
@@ -75,9 +69,13 @@ public class AdminFrame extends JFrame {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         String[] gameColumns = { "Codigo", "Titulo", "Genero", "Precio", "Edad Min", "Downloads" };
-        gamesModel = new DefaultTableModel(gameColumns, 0);
+        gamesModel = new DefaultTableModel(gameColumns, 0){
+            @Override
+            public boolean isCellEditable(int row, int column) { return false; }
+        };
         gamesTable = new JTable(gamesModel);
         panel.add(new JScrollPane(gamesTable), BorderLayout.CENTER);
+        
         JPanel controlPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
         JButton backButton = new JButton("Retroceder al Menu");
         JButton addButton = new JButton("Anadir Juego");
@@ -88,10 +86,12 @@ public class AdminFrame extends JFrame {
         controlPanel.add(editButton);
         controlPanel.add(deleteButton);
         panel.add(controlPanel, BorderLayout.SOUTH);
+        
         backButton.addActionListener(e -> cardLayout.show(mainPanel, "WELCOME"));
         addButton.addActionListener(e -> addGame());
         editButton.addActionListener(e -> editGamePrice());
         deleteButton.addActionListener(e -> deleteGame());
+        
         return panel;
     }
     
@@ -99,9 +99,13 @@ public class AdminFrame extends JFrame {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         String[] userColumns = { "Codigo", "Username", "Nombre", "Tipo", "Estado" };
-        usersModel = new DefaultTableModel(userColumns, 0);
+        usersModel = new DefaultTableModel(userColumns, 0){
+            @Override
+            public boolean isCellEditable(int row, int column) { return false; }
+        };
         usersTable = new JTable(usersModel);
         panel.add(new JScrollPane(usersTable), BorderLayout.CENTER);
+
         JPanel controlPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
         JButton backButton = new JButton("Retroceder al Menu");
         JButton activateButton = new JButton("Activar Usuario");
@@ -110,18 +114,45 @@ public class AdminFrame extends JFrame {
         controlPanel.add(activateButton);
         controlPanel.add(deactivateButton);
         panel.add(controlPanel, BorderLayout.SOUTH);
+        
         backButton.addActionListener(e -> cardLayout.show(mainPanel, "WELCOME"));
         activateButton.addActionListener(e -> updateUserStatus(true));
         deactivateButton.addActionListener(e -> updateUserStatus(false));
+
         return panel;
     }
-    
+
     private void refreshGamesTable() {
-        JOptionPane.showMessageDialog(this, "Funcionalidad no disponible: Steam.java no tiene un metodo para listar todos los juegos.");
+        gamesModel.setRowCount(0);
+        try {
+            GameNode current = Steam.getINSTANCE().printGames();
+            while (current != null) {
+                gamesModel.addRow(new Object[]{
+                    current.code, current.titulo, current.genero,
+                    String.format("%.2f", current.precio), current.edadMin, current.dls
+                });
+                current = current.next;
+            }
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, "Error al cargar juegos: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
     
     private void refreshUsersTable() {
-        JOptionPane.showMessageDialog(this, "Funcionalidad no disponible: Steam.java no tiene un metodo para listar todos los usuarios.");
+        usersModel.setRowCount(0);
+        try {
+            Nodo<Steam.Player> current = Steam.getINSTANCE().printPlayers();
+            while (current != null) {
+                Steam.Player player = current.data;
+                usersModel.addRow(new Object[]{
+                    player.code(), player.username(), player.fullName(), 
+                    player.userType(), player.isActive() ? "Activo" : "Inactivo"
+                });
+                current = current.siguiente;
+            }
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, "Error al cargar usuarios: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
     
     private void addGame() {
@@ -133,14 +164,14 @@ public class AdminFrame extends JFrame {
     private void editGamePrice() {
         int selectedRow = gamesTable.getSelectedRow();
         if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(this, "Por favor, seleccione un juego de la tabla para modificar.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Por favor, seleccione un juego de la tabla.", "Advertencia", JOptionPane.WARNING_MESSAGE);
             return;
         }
         
         int gameCode = (int) gamesModel.getValueAt(selectedRow, 0);
         String newPriceStr = JOptionPane.showInputDialog(this, "Ingrese el nuevo precio para el juego con codigo " + gameCode + ":");
 
-        if (newPriceStr != null && !newPriceStr.isEmpty()) {
+        if (newPriceStr != null && !newPriceStr.trim().isEmpty()) {
             try {
                 double newPrice = Double.parseDouble(newPriceStr);
                 if (Steam.getINSTANCE().updatePriceFor(gameCode, newPrice)) {
@@ -158,15 +189,70 @@ public class AdminFrame extends JFrame {
     }
 
     private void deleteGame() {
-        JOptionPane.showMessageDialog(this, "Funcionalidad no disponible: Steam.java no tiene un metodo para eliminar juegos.");
+        int selectedRow = gamesTable.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Por favor, seleccione un juego de la tabla para eliminar.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int gameCode = (int) gamesModel.getValueAt(selectedRow, 0);
+        int confirmation = JOptionPane.showConfirmDialog(this, 
+                "Esta seguro de que desea eliminar permanentemente el juego con codigo " + gameCode + "?", 
+                "Confirmar Eliminacion", JOptionPane.YES_NO_OPTION);
+
+        if (confirmation == JOptionPane.YES_OPTION) {
+            try {
+                if (Steam.getINSTANCE().deleteGame(gameCode)) {
+                    JOptionPane.showMessageDialog(this, "Juego eliminado correctamente.");
+                    refreshGamesTable();
+                } else {
+                    JOptionPane.showMessageDialog(this, "No se encontro el juego a eliminar.", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(this, "Error de archivo al eliminar: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
     }
     
     private void updateUserStatus(boolean newStatus) {
-        JOptionPane.showMessageDialog(this, "Funcionalidad no disponible: Steam.java no tiene un metodo para cambiar el estado de un usuario.");
+        int selectedRow = usersTable.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Por favor, seleccione un usuario de la tabla.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        int userCode = (int) usersModel.getValueAt(selectedRow, 0);
+        String action = newStatus ? "activar" : "desactivar";
+
+        try {
+            if (Steam.getINSTANCE().updatePlayerStatus(userCode, newStatus)) {
+                JOptionPane.showMessageDialog(this, "Usuario " + action + "do correctamente.");
+                refreshUsersTable();
+            } else {
+                 JOptionPane.showMessageDialog(this, "No se encontro el usuario.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        } catch (IOException e) {
+             JOptionPane.showMessageDialog(this, "Error de archivo: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
     
     private void generateClientReport() {
-        JOptionPane.showMessageDialog(this, "Funcionalidad no disponible: Steam.java no tiene un metodo para generar reportes.");
+        String clientCodeStr = JOptionPane.showInputDialog(this, "Ingrese el codigo del cliente:", "Generar Reporte", JOptionPane.PLAIN_MESSAGE);
+        if (clientCodeStr != null && !clientCodeStr.trim().isEmpty()) {
+            try {
+                int clientCode = Integer.parseInt(clientCodeStr);
+                String fileName = "reporte_cliente_" + clientCode + ".txt";
+                if (Steam.getINSTANCE().reportForClient(clientCode, fileName)) {
+                    JOptionPane.showMessageDialog(this, "Reporte '" + fileName + "' generado exitosamente en la carpeta 'steam'.", "Exito", JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(this, "No se pudo generar el reporte. Verifique que el codigo del cliente es correcto.", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Por favor, ingrese un codigo numerico valido.", "Error de Formato", JOptionPane.ERROR_MESSAGE);
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(this, "Error de archivo al generar el reporte: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
     }
 
     private void logout() {

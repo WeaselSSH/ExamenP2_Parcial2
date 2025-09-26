@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package steam;
 
 import com.toedter.calendar.JDateChooser;
@@ -11,15 +7,11 @@ import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
+import java.io.IOException;
 import java.util.Date;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
 
-/**
- *
- * @author saidn
- */
 public class RegisterFrame extends JFrame {
 
     private LoginFrame loginFrame;
@@ -37,6 +29,7 @@ public class RegisterFrame extends JFrame {
         setSize(550, 450);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
+        setResizable(false);
 
         JPanel mainContentPanel = new JPanel(new BorderLayout(10, 10));
         mainContentPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
@@ -81,14 +74,17 @@ public class RegisterFrame extends JFrame {
         imagePreviewLabel.setHorizontalAlignment(SwingConstants.CENTER);
         imagePreviewLabel.setVerticalAlignment(SwingConstants.CENTER);
         imagePreviewPanel.add(imagePreviewLabel, BorderLayout.CENTER);
-        JPanel buttonPanel = new JPanel();
+
+        JPanel buttonPanel = new JPanel(new GridBagLayout());
         JButton registerButton = new JButton("Registrar");
         JButton cancelButton = new JButton("Cancelar");
         buttonPanel.add(registerButton);
         buttonPanel.add(cancelButton);
+
         JPanel bottomPanel = new JPanel(new GridLayout(1, 2, 10, 0));
         bottomPanel.add(imagePreviewPanel);
         bottomPanel.add(buttonPanel);
+
         mainContentPanel.add(formPanel, BorderLayout.NORTH);
         mainContentPanel.add(bottomPanel, BorderLayout.CENTER);
         add(mainContentPanel);

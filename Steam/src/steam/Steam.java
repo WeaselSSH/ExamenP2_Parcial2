@@ -1,11 +1,10 @@
 package steam;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 
@@ -66,6 +65,8 @@ public class Steam {
         }
     }
 
+    public record Player(int code, String username, String password, String fullName, long birthDate, int downloads, String photoPath, String userType, boolean isActive) {}
+
     public void addGame(String title, String genre, char os, int edadMinima, double precio,
             String path) throws IOException {
         rgames.seek(rgames.length());
@@ -94,283 +95,297 @@ public class Steam {
     }
 
     public boolean downloadGame(int gameCode, int clientCode, char sistemaOperativo) throws IOException {
-        rgames.seek(0);
-        boolean gCodeExists = false;
-        char os = 'n';
-        int edadMinima = 0;
-        long nacimiento = 0;
-        double precio = 0;
-        String username = "";
-        String title = "";
-        String path = "";
-        long posClient = 0;
-        long posGame = 0;
-        boolean activo = false;
+        GameNode gameToDownload = findGameByCode(gameCode);
+        Player downloadingPlayer = findPlayerByCode(clientCode);
 
-        while (rgames.getFilePointer() < rgames.length()) {
-            int tmpCode = rgames.readInt();
-            long tmpPosGame = rgames.getFilePointer();
-            String tmpTitle = rgames.readUTF();
-            rgames.readUTF();
-            char tmpos = rgames.readChar();
-            int tmpedadMinima = rgames.readInt();
-            double tmpPrecio = rgames.readDouble();
-            rgames.readInt();
-            String tmpPath = rgames.readUTF();
-            if (tmpCode == gameCode) {
-                gCodeExists = true;
-                os = tmpos;
-                edadMinima = tmpedadMinima;
-                title = tmpTitle;
-                path = tmpPath;
-                precio = tmpPrecio;
-                posGame = tmpPosGame;
-            }
+        if (gameToDownload == null || downloadingPlayer == null || !downloadingPlayer.isActive()) return false;
+        
+        Calendar birthCal = Calendar.getInstance();
+        birthCal.setTimeInMillis(downloadingPlayer.birthDate());
+        int age = Calendar.getInstance().get(Calendar.YEAR) - birthCal.get(Calendar.YEAR);
+        if (Calendar.getInstance().get(Calendar.DAY_OF_YEAR) < birthCal.get(Calendar.DAY_OF_YEAR)) {
+            age--;
         }
 
-        rplayer.seek(0);
-        boolean cCodeExists = false;
-        while (rplayer.getFilePointer() < rplayer.length()) {
-            int tmpCode = rplayer.readInt();
-            long tmpPosClient = rplayer.getFilePointer();
-            String usernameTmp = rplayer.readUTF();
-            rplayer.readUTF();
-            rplayer.readUTF();
-            long tmpNacimiento = rplayer.readLong();
-            rplayer.readInt();
-            rplayer.readUTF();
-            rplayer.readUTF();
-            boolean tmpActivo = rplayer.readBoolean();
-            if (tmpCode == clientCode) {
-                cCodeExists = true;
-                nacimiento = tmpNacimiento;
-                username = usernameTmp;
-                activo = tmpActivo;
-                posClient = tmpPosClient;
-            }
-        }
+        if (gameToDownload.so != sistemaOperativo || age < gameToDownload.edadMin) return false;
 
-        Date edadJugador = new Date(nacimiento);
-        Calendar cal = Calendar.getInstance();
-        cal.setTime(edadJugador);
-        Calendar hoy = Calendar.getInstance();
-        int edad = hoy.get(Calendar.YEAR) - cal.get(Calendar.YEAR);
-        if (hoy.get(Calendar.DAY_OF_YEAR) < cal.get(Calendar.DAY_OF_YEAR)) {
-            edad--;
-        }
-
-        if (activo == true && gCodeExists == true && cCodeExists == true && os == sistemaOperativo && edad >= edadMinima) {
-            int downloadCode = getCode(3);
-            RandomAccessFile rdownloads = new RandomAccessFile("steam/downloads/download_" + downloadCode + ".stm", "rw");
+        int downloadCode = getCode(3);
+        try (RandomAccessFile rdownloads = new RandomAccessFile("steam/downloads/download_" + downloadCode + ".stm", "rw")) {
             rdownloads.writeInt(downloadCode);
             rdownloads.writeInt(clientCode);
-            rdownloads.writeUTF(username);
+            rdownloads.writeUTF(downloadingPlayer.fullName());
             rdownloads.writeInt(gameCode);
-            rdownloads.writeUTF(title);
-            rdownloads.writeUTF(path);
-            rdownloads.writeDouble(precio);
-            rdownloads.writeLong(Calendar.getInstance().getTimeInMillis());
+            rdownloads.writeUTF(gameToDownload.titulo);
+            rdownloads.writeUTF(gameToDownload.path);
+            rdownloads.writeDouble(gameToDownload.precio);
+            rdownloads.writeLong(System.currentTimeMillis());
+        }
 
-            rgames.seek(posGame);
-            rgames.readUTF();
-            rgames.readUTF();
-            rgames.readChar();
-            rgames.readInt();
-            rgames.readDouble();
-            long posDG = rgames.getFilePointer();
-            int cdownloads = rgames.readInt();
-            rgames.seek(posDG);
-            rgames.writeInt(cdownloads + 1);
+        updateDownloadCount(gameCode, clientCode);
+        return true;
+    }
+    
+    private void updateDownloadCount(int gameCode, int clientCode) throws IOException {
+        long gamePos = findGamePosition(gameCode);
+        if (gamePos != -1) {
+            rgames.seek(gamePos);
+            GameNode g = readGameNode();
+            long currentPos = rgames.getFilePointer();
+            rgames.seek(currentPos - g.path.length() - 2 - 4);
+            rgames.writeInt(g.dls + 1);
+        }
 
-            rplayer.seek(posClient);
-            rplayer.readUTF();
-            rplayer.readUTF();
-            rplayer.readUTF();
-            rplayer.readLong();
-            long posDP = rplayer.getFilePointer();
-            int cdownloadsp = rplayer.readInt();
-            rplayer.seek(posDP);
-            rplayer.writeInt(cdownloadsp + 1);
-            return true;
-        } else {
-            return false;
+        long playerPos = findPlayerPosition(clientCode);
+        if(playerPos != -1) {
+            rplayer.seek(playerPos);
+            Player p = readPlayer();
+            long currentPos = rplayer.getFilePointer();
+            rplayer.seek(currentPos - p.photoPath().length() - 2 - p.userType().length() - 2 - 1 - 4);
+            rplayer.writeInt(p.downloads() + 1);
         }
     }
 
     public String login(String username, String password) throws IOException {
-        rplayer.seek(0);
-        while (rplayer.getFilePointer() < rplayer.length()) {
-            int code = rplayer.readInt();
-            String fileUsername = rplayer.readUTF();
-            String filePassword = rplayer.readUTF();
-            String nombre = rplayer.readUTF();
-            long nacimiento = rplayer.readLong();
-            int contDescargas = rplayer.readInt();
-            String imgPath = rplayer.readUTF();
-            String tipoUsuario = rplayer.readUTF();
-            boolean estado = rplayer.readBoolean();
-            if (fileUsername.equals(username) && filePassword.equals(password)) {
-                return estado ? tipoUsuario : "INACTIVE";
+        Nodo<Player> players = printPlayers();
+        Nodo<Player> current = players;
+        while(current != null){
+            if(current.data.username().equals(username) && current.data.password().equals(password)){
+                return current.data.isActive() ? current.data.userType() : "INACTIVE";
             }
+            current = current.siguiente;
         }
         return null;
     }
 
     public boolean updatePriceFor(int codeGame, double newPrice) throws IOException {
-        rgames.seek(0);
-        while (rgames.getFilePointer() < rgames.length()) {
-            int code = rgames.readInt();
+        long gamePos = findGamePosition(codeGame);
+        if (gamePos != -1) {
+            rgames.seek(gamePos);
+            rgames.readInt(); 
             rgames.readUTF();
             rgames.readUTF();
             rgames.readChar();
             rgames.readInt();
-            long pricePos = rgames.getFilePointer();
-            rgames.readDouble();
-            rgames.readInt();
-            rgames.readUTF();
-            if (code == codeGame) {
-                rgames.seek(pricePos);
-                rgames.writeDouble(newPrice);
-                return true;
+            rgames.writeDouble(newPrice);
+            return true;
+        }
+        return false;
+    }
+    
+    public Player getPlayerByUsername(String username) throws IOException {
+        Nodo<Player> players = printPlayers();
+        Nodo<Player> current = players;
+        while(current != null){
+            if(current.data.username().equals(username)){
+                return current.data;
             }
+            current = current.siguiente;
+        }
+        return null;
+    }
+    
+    public GameNode printGames() throws IOException {
+        GameNode head = null, tail = null;
+        rgames.seek(0);
+        while(rgames.getFilePointer() < rgames.length()) {
+            GameNode newNode = readGameNode();
+            if(head == null) {
+                head = tail = newNode;
+            } else {
+                tail.next = newNode;
+                tail = newNode;
+            }
+        }
+        return head;
+    }
+    
+    public Nodo<Player> printPlayers() throws IOException {
+        Nodo<Player> head = null, tail = null;
+        rplayer.seek(0);
+        while(rplayer.getFilePointer() < rplayer.length()){
+            Player p = readPlayer();
+            Nodo<Player> newNode = new Nodo<>(p);
+            if(head == null) {
+                head = tail = newNode;
+            } else {
+                tail.siguiente = newNode;
+                tail = newNode;
+            }
+        }
+        return head;
+    }
+
+    public boolean updatePlayerStatus(int playerCode, boolean newStatus) throws IOException {
+        long playerPos = findPlayerPosition(playerCode);
+        if(playerPos != -1){
+            rplayer.seek(playerPos);
+            readPlayer();
+            long finalPos = rplayer.getFilePointer();
+            rplayer.seek(finalPos - 1); 
+            rplayer.writeBoolean(newStatus);
+            return true;
         }
         return false;
     }
 
-    // ----- INICIO DE MÉTODOS AÑADIDOS -----
-
-    public boolean reportForClient(int codeClient, String txtFile) throws IOException {
-        // 1. BUSCAR DATOS DEL CLIENTE
-        rplayer.seek(0);
-        String clientName = null, clientUsername = null;
-        long clientBirth = 0;
-        boolean clientStatus = false;
-        int totalDownloads = 0;
-
-        while (rplayer.getFilePointer() < rplayer.length()) {
-            int code = rplayer.readInt();
-            String username = rplayer.readUTF();
-            rplayer.readUTF(); // password
-            String nombre = rplayer.readUTF();
-            long nacimiento = rplayer.readLong();
-            int downloads = rplayer.readInt();
-            rplayer.readUTF(); // path
-            rplayer.readUTF(); // tipo
-            boolean estado = rplayer.readBoolean();
-            if (code == codeClient) {
-                clientName = nombre;
-                clientUsername = username;
-                clientBirth = nacimiento;
-                clientStatus = estado;
-                totalDownloads = downloads;
-                break;
+    public boolean deleteGame(int gameCode) throws IOException {
+        File originalFile = new File("steam/games.stm");
+        File tempFile = new File("steam/games_temp.stm");
+        boolean deleted = false;
+        
+        try (RandomAccessFile rafTemp = new RandomAccessFile(tempFile, "rw")) {
+            rgames.seek(0);
+            while (rgames.getFilePointer() < rgames.length()) {
+                long startPos = rgames.getFilePointer();
+                GameNode currentGame = readGameNode();
+                
+                if (currentGame.code != gameCode) {
+                    rgames.seek(startPos);
+                    byte[] recordData = new byte[getGameRecordSize(currentGame)];
+                    rgames.read(recordData);
+                    rafTemp.write(recordData);
+                } else {
+                    deleted = true;
+                }
             }
         }
+        
+        rgames.close();
 
-        if (clientName == null) {
-            return false; // Cliente no encontrado
+        if(originalFile.delete()){
+            tempFile.renameTo(originalFile);
+        } else {
+             rgames = new RandomAccessFile(originalFile, "rw");
+             throw new IOException("No se pudo reemplazar el archivo de juegos.");
+        }
+        
+        rgames = new RandomAccessFile(originalFile, "rw");
+        return deleted;
+    }
+    
+    public boolean reportForClient(int codeClient, String txtFile) throws IOException {
+        Player client = findPlayerByCode(codeClient);
+        if (client == null) {
+            return false;
         }
 
-        // 2. RECOLECTAR HISTORIAL DE DESCARGAS
-        ArrayList<String> downloadHistoryLines = new ArrayList<>();
-        File downloadsDir = new File("steam/downloads");
-        File[] downloadFiles = downloadsDir.listFiles();
+        DownloadNode downloadHistory = null;
+        File downloadsFolder = new File("steam/downloads");
+        File[] downloadFiles = downloadsFolder.listFiles();
 
         if (downloadFiles != null) {
-            for (File f : downloadFiles) {
-                if (f.isFile() && f.getName().startsWith("download_") && f.getName().endsWith(".stm")) {
-                    try (RandomAccessFile r_download = new RandomAccessFile(f, "r")) {
-                        r_download.readInt(); // downloadId
-                        int playerCodeInFile = r_download.readInt();
+            for (File file : downloadFiles) {
+                if (file.isFile() && file.getName().startsWith("download_")) {
+                    try (RandomAccessFile rafDownload = new RandomAccessFile(file, "r")) {
+                        int downloadId = rafDownload.readInt();
+                        int playerCodeInFile = rafDownload.readInt();
+                        
                         if (playerCodeInFile == codeClient) {
-                            r_download.readUTF(); // playerName
-                            int gameCode = r_download.readInt();
-                            String gameName = r_download.readUTF();
-                            r_download.readUTF(); // path
-                            double gamePrice = r_download.readDouble();
-                            long downloadDate = r_download.readLong();
+                            rafDownload.readUTF();
+                            int gameCode = rafDownload.readInt();
+                            String gameName = rafDownload.readUTF();
+                            rafDownload.readUTF();
+                            double price = rafDownload.readDouble();
+                            long date = rafDownload.readLong();
+                            String genre = findGameByCode(gameCode).genero;
                             
-                            String formattedDate = new SimpleDateFormat("yyyy-MM-dd").format(new Date(downloadDate));
-                            String genre = getGameGenre(gameCode);
-                            
-                            String line = String.format("%s | %-11s | %-9d | %-20s | $%-8.2f | %s",
-                                    formattedDate, f.getName().split("_|\\.")[1], gameCode, gameName, gamePrice, genre);
-                            downloadHistoryLines.add(line);
+                            DownloadNode newNode = new DownloadNode(downloadId, gameCode, gameName, genre, price, date);
+                            newNode.next = downloadHistory;
+                            downloadHistory = newNode;
                         }
                     }
                 }
             }
         }
 
-        // 3. ESCRIBIR EL ARCHIVO DE REPORTE
-        try (FileWriter writer = new FileWriter(txtFile)) {
-            writer.write("REPORTE CLIENTE: " + clientName + " (username: " + clientUsername + ")\n");
+        try (PrintWriter writer = new PrintWriter(new File("steam/" + txtFile))) {
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+            Calendar birthCal = Calendar.getInstance();
+            birthCal.setTimeInMillis(client.birthDate());
+            int age = Calendar.getInstance().get(Calendar.YEAR) - birthCal.get(Calendar.YEAR);
+            if(Calendar.getInstance().get(Calendar.DAY_OF_YEAR) < birthCal.get(Calendar.DAY_OF_YEAR)) age--;
             
-            Date birthDate = new Date(clientBirth);
-            Calendar cal = Calendar.getInstance();
-            cal.setTime(birthDate);
-            Calendar hoy = Calendar.getInstance();
-            int edad = hoy.get(Calendar.YEAR) - cal.get(Calendar.YEAR);
-            if (hoy.get(Calendar.DAY_OF_YEAR) < cal.get(Calendar.DAY_OF_YEAR)) edad--;
+            writer.println("REPORTE CLIENTE: " + client.fullName() + " (username: " + client.username() + ")");
+            writer.println("Codigo cliente: " + client.code());
+            writer.println("Fecha de nacimiento: " + dateFormat.format(new Date(client.birthDate())) + " (" + age + " anos)");
+            writer.println("Estado: " + (client.isActive() ? "ACTIVO" : "DESACTIVO"));
+            writer.println("Total downloads: " + client.downloads());
+            writer.println();
+            writer.println("HISTORIAL DE DESCARGAS:");
+            writer.println("FECHA(YYYY-MM-DD) | DOWNLOAD ID | GAME CODE | GAME NAME | PRICE | GENRE");
             
-            writer.write("Código cliente: " + codeClient + "\n");
-            writer.write("Fecha de nacimiento: " + new SimpleDateFormat("yyyy-MM-dd").format(birthDate) + " (" + edad + " años)\n");
-            writer.write("Estado: " + (clientStatus ? "ACTIVO" : "DESACTIVO") + "\n");
-            writer.write("Total downloads: " + totalDownloads + "\n\n");
-            writer.write("HISTORIAL DE DESCARGAS:\n");
-            writer.write("FECHA(YYYY-MM-DD) | DOWNLOAD ID | GAME CODE | GAME NAME                | PRICE    | GENRE\n");
-            
-            for (String record : downloadHistoryLines) {
-                writer.write(record + "\n");
+            DownloadNode current = downloadHistory;
+            while(current != null) {
+                writer.printf("%s | %-11d | %-9d | %-25s | %-5.2f | %s%n",
+                        dateFormat.format(new Date(current.fechaMillis)),
+                        current.downloadId,
+                        current.gameCode,
+                        current.gameName,
+                        current.price,
+                        current.genre);
+                current = current.next;
             }
         }
+        
+        System.out.println("REPORTE CREADO");
         return true;
     }
-
-    public ArrayList<Object[]> printGames() throws IOException {
-        ArrayList<Object[]> gamesList = new ArrayList<>();
-        rgames.seek(0);
-        while (rgames.getFilePointer() < rgames.length()) {
-            int code = rgames.readInt();
-            String titulo = rgames.readUTF();
-            String genero = rgames.readUTF();
-            char osChar = rgames.readChar();
-            int edad = rgames.readInt();
-            double precio = rgames.readDouble();
-            int downloads = rgames.readInt();
-            rgames.readUTF(); // path
-
-            String os = "";
-            switch (osChar) {
-                case 'W': os = "Windows"; break;
-                case 'M': os = "Mac"; break;
-                case 'L': os = "Linux"; break;
-            }
-            
-            Object[] row = {code, titulo, genero, os, edad, precio, downloads};
-            gamesList.add(row);
+    
+    private Player findPlayerByCode(int code) throws IOException {
+        Nodo<Player> players = printPlayers();
+        Nodo<Player> current = players;
+        while(current != null) {
+            if(current.data.code() == code) return current.data;
+            current = current.siguiente;
         }
-        return gamesList;
+        return null;
     }
     
-    private String getGameGenre(int gameCode) throws IOException {
-        long originalPos = rgames.getFilePointer(); // Guardar posición actual
-        rgames.seek(0);
-        while (rgames.getFilePointer() < rgames.length()) {
-            int code = rgames.readInt();
-            rgames.readUTF(); // titulo
-            String genre = rgames.readUTF();
-            if (code == gameCode) {
-                rgames.seek(originalPos); // Restaurar posición
-                return genre;
-            }
-            rgames.readChar();
-            rgames.readInt();
-            rgames.readDouble();
-            rgames.readInt();
-            rgames.readUTF();
+    private GameNode findGameByCode(int code) throws IOException {
+        GameNode games = printGames();
+        GameNode current = games;
+        while(current != null) {
+            if(current.code == code) return current;
+            current = current.next;
         }
-        rgames.seek(originalPos); // Restaurar posición si no se encuentra
-        return "Desconocido";
+        return null;
     }
-}   
+    
+    private long findGamePosition(int code) throws IOException {
+        rgames.seek(0);
+        while(rgames.getFilePointer() < rgames.length()){
+            long pos = rgames.getFilePointer();
+            if(rgames.readInt() == code) return pos;
+            rgames.seek(pos);
+            readGameNode();
+        }
+        return -1;
+    }
+    
+    private long findPlayerPosition(int code) throws IOException {
+        rplayer.seek(0);
+        while(rplayer.getFilePointer() < rplayer.length()){
+            long pos = rplayer.getFilePointer();
+            if(rplayer.readInt() == code) return pos;
+            rplayer.seek(pos);
+            readPlayer();
+        }
+        return -1;
+    }
+    
+    private GameNode readGameNode() throws IOException {
+        return new GameNode(rgames.readInt(), rgames.readUTF(), rgames.readUTF(), rgames.readChar(), rgames.readInt(), rgames.readDouble(), rgames.readInt(), rgames.readUTF());
+    }
+
+    private Player readPlayer() throws IOException {
+        return new Player(rplayer.readInt(), rplayer.readUTF(), rplayer.readUTF(), rplayer.readUTF(), rplayer.readLong(), rplayer.readInt(), rplayer.readUTF(), rplayer.readUTF(), rplayer.readBoolean());
+    }
+
+    private int getGameRecordSize(GameNode node) {
+        return 4 + (2 + node.titulo.getBytes().length) + (2 + node.genero.getBytes().length) + 2 + 4 + 8 + 4 + (2 + node.path.getBytes().length);
+    }
+    
+    public static Steam getINSTANCE() {
+        return INSTANCE;
+    }
+}

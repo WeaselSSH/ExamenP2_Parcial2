@@ -1,15 +1,17 @@
 package steam;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 
 public class Steam {
 
     private RandomAccessFile rcods, rgames, rplayer;
-
     private static final Steam INSTANCE = new Steam();
 
     private Steam() {
@@ -18,23 +20,15 @@ public class Steam {
             if (!dir.mkdirs() && !dir.exists()) {
                 throw new IOException("No se pudo crear steam/downloads");
             }
-
             rcods = new RandomAccessFile("steam/codes.stm", "rw");
             rgames = new RandomAccessFile("steam/games.stm", "rw");
             rplayer = new RandomAccessFile("steam/player.stm", "rw");
-
             initCodes();
         } catch (IOException e) {
             throw new RuntimeException("Fallo inicializando archivos: " + e.getMessage());
         }
     }
 
-    /*
-    Formato code: 
-    int codeJuego
-    int codeClientes
-    int codeDownloads
-     */
     private void initCodes() throws IOException {
         if (rcods.length() == 0) {
             rcods.writeInt(1);
@@ -46,15 +40,11 @@ public class Steam {
     private int getCode(int opt) throws IOException {
         rcods.seek(0);
         int codeJuego = rcods.readInt();
-
         long posCliente = rcods.getFilePointer();
         int codeClientes = rcods.readInt();
-
         long posDownloads = rcods.getFilePointer();
         int codeDownloads = rcods.readInt();
-
         int code;
-
         switch (opt) {
             case 1:
                 code = codeJuego;
@@ -76,20 +66,8 @@ public class Steam {
         }
     }
 
-    /*
-    Formato: games.stm
-    int code;
-    String titulo;
-    String genero;
-    char sistemaOperativo;
-    int edadMinima;
-    double precio;
-    int cDownloads;
-    String path;
-     */
     public void addGame(String title, String genre, char os, int edadMinima, double precio,
             String path) throws IOException {
-
         rgames.seek(rgames.length());
         rgames.writeInt(getCode(1));
         rgames.writeUTF(title);
@@ -101,21 +79,8 @@ public class Steam {
         rgames.writeUTF(path);
     }
 
-    /*
-    Formato: player.stm
-    int code;
-    String username;
-    String password;
-    String nombre;
-    long nacimiento;
-    int contadorDownloads;
-    String path;
-    String tipoUsuario;
-    Boolean estado;
-     */
     public void addPlayer(String u, String pass, String nombre, long nacimiento, String path,
             String tipoUsuario) throws IOException {
-
         rplayer.seek(rplayer.length());
         rplayer.writeInt(getCode(2));
         rplayer.writeUTF(u);
@@ -152,7 +117,6 @@ public class Steam {
             double tmpPrecio = rgames.readDouble();
             rgames.readInt();
             String tmpPath = rgames.readUTF();
-
             if (tmpCode == gameCode) {
                 gCodeExists = true;
                 os = tmpos;
@@ -166,7 +130,6 @@ public class Steam {
 
         rplayer.seek(0);
         boolean cCodeExists = false;
-
         while (rplayer.getFilePointer() < rplayer.length()) {
             int tmpCode = rplayer.readInt();
             long tmpPosClient = rplayer.getFilePointer();
@@ -178,7 +141,6 @@ public class Steam {
             rplayer.readUTF();
             rplayer.readUTF();
             boolean tmpActivo = rplayer.readBoolean();
-
             if (tmpCode == clientCode) {
                 cCodeExists = true;
                 nacimiento = tmpNacimiento;
@@ -189,31 +151,17 @@ public class Steam {
         }
 
         Date edadJugador = new Date(nacimiento);
-
         Calendar cal = Calendar.getInstance();
         cal.setTime(edadJugador);
         Calendar hoy = Calendar.getInstance();
-
         int edad = hoy.get(Calendar.YEAR) - cal.get(Calendar.YEAR);
         if (hoy.get(Calendar.DAY_OF_YEAR) < cal.get(Calendar.DAY_OF_YEAR)) {
             edad--;
         }
 
-        /*
-        Formato download_codigodownload.stm
-        int downloadCode;
-        int playerCode;
-        String playerName;
-        int gameCode;
-        String gameName;
-        Image gameImage;
-        Double gamePrice;
-        long fechaDownload;
-         */
         if (activo == true && gCodeExists == true && cCodeExists == true && os == sistemaOperativo && edad >= edadMinima) {
             int downloadCode = getCode(3);
             RandomAccessFile rdownloads = new RandomAccessFile("steam/downloads/download_" + downloadCode + ".stm", "rw");
-
             rdownloads.writeInt(downloadCode);
             rdownloads.writeInt(clientCode);
             rdownloads.writeUTF(username);
@@ -243,7 +191,6 @@ public class Steam {
             int cdownloadsp = rplayer.readInt();
             rplayer.seek(posDP);
             rplayer.writeInt(cdownloadsp + 1);
-
             return true;
         } else {
             return false;
@@ -262,7 +209,6 @@ public class Steam {
             String imgPath = rplayer.readUTF();
             String tipoUsuario = rplayer.readUTF();
             boolean estado = rplayer.readBoolean();
-
             if (fileUsername.equals(username) && filePassword.equals(password)) {
                 return estado ? tipoUsuario : "INACTIVE";
             }
@@ -282,7 +228,6 @@ public class Steam {
             rgames.readDouble();
             rgames.readInt();
             rgames.readUTF();
-
             if (code == codeGame) {
                 rgames.seek(pricePos);
                 rgames.writeDouble(newPrice);
@@ -292,33 +237,140 @@ public class Steam {
         return false;
     }
 
-    public record Player(int code, String username, String password, String fullName, long birthDate, int downloads, String photoPath, String userType, boolean isActive) {
+    // ----- INICIO DE MÉTODOS AÑADIDOS -----
 
-    }
-
-    public Player getPlayerByUsername(String username) throws IOException {
+    public boolean reportForClient(int codeClient, String txtFile) throws IOException {
+        // 1. BUSCAR DATOS DEL CLIENTE
         rplayer.seek(0);
+        String clientName = null, clientUsername = null;
+        long clientBirth = 0;
+        boolean clientStatus = false;
+        int totalDownloads = 0;
+
         while (rplayer.getFilePointer() < rplayer.length()) {
             int code = rplayer.readInt();
-            String fileUsername = rplayer.readUTF();
-            String filePassword = rplayer.readUTF();
+            String username = rplayer.readUTF();
+            rplayer.readUTF(); // password
             String nombre = rplayer.readUTF();
             long nacimiento = rplayer.readLong();
-            int contDescargas = rplayer.readInt();
-            String imgPath = rplayer.readUTF();
-            String tipoUsuario = rplayer.readUTF();
+            int downloads = rplayer.readInt();
+            rplayer.readUTF(); // path
+            rplayer.readUTF(); // tipo
             boolean estado = rplayer.readBoolean();
-            if (fileUsername.equals(username)) {
-                return new Player(code, fileUsername, filePassword, nombre, nacimiento, contDescargas, imgPath, tipoUsuario, estado);
+            if (code == codeClient) {
+                clientName = nombre;
+                clientUsername = username;
+                clientBirth = nacimiento;
+                clientStatus = estado;
+                totalDownloads = downloads;
+                break;
             }
         }
-        return null;
+
+        if (clientName == null) {
+            return false; // Cliente no encontrado
+        }
+
+        // 2. RECOLECTAR HISTORIAL DE DESCARGAS
+        ArrayList<String> downloadHistoryLines = new ArrayList<>();
+        File downloadsDir = new File("steam/downloads");
+        File[] downloadFiles = downloadsDir.listFiles();
+
+        if (downloadFiles != null) {
+            for (File f : downloadFiles) {
+                if (f.isFile() && f.getName().startsWith("download_") && f.getName().endsWith(".stm")) {
+                    try (RandomAccessFile r_download = new RandomAccessFile(f, "r")) {
+                        r_download.readInt(); // downloadId
+                        int playerCodeInFile = r_download.readInt();
+                        if (playerCodeInFile == codeClient) {
+                            r_download.readUTF(); // playerName
+                            int gameCode = r_download.readInt();
+                            String gameName = r_download.readUTF();
+                            r_download.readUTF(); // path
+                            double gamePrice = r_download.readDouble();
+                            long downloadDate = r_download.readLong();
+                            
+                            String formattedDate = new SimpleDateFormat("yyyy-MM-dd").format(new Date(downloadDate));
+                            String genre = getGameGenre(gameCode);
+                            
+                            String line = String.format("%s | %-11s | %-9d | %-20s | $%-8.2f | %s",
+                                    formattedDate, f.getName().split("_|\\.")[1], gameCode, gameName, gamePrice, genre);
+                            downloadHistoryLines.add(line);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. ESCRIBIR EL ARCHIVO DE REPORTE
+        try (FileWriter writer = new FileWriter(txtFile)) {
+            writer.write("REPORTE CLIENTE: " + clientName + " (username: " + clientUsername + ")\n");
+            
+            Date birthDate = new Date(clientBirth);
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(birthDate);
+            Calendar hoy = Calendar.getInstance();
+            int edad = hoy.get(Calendar.YEAR) - cal.get(Calendar.YEAR);
+            if (hoy.get(Calendar.DAY_OF_YEAR) < cal.get(Calendar.DAY_OF_YEAR)) edad--;
+            
+            writer.write("Código cliente: " + codeClient + "\n");
+            writer.write("Fecha de nacimiento: " + new SimpleDateFormat("yyyy-MM-dd").format(birthDate) + " (" + edad + " años)\n");
+            writer.write("Estado: " + (clientStatus ? "ACTIVO" : "DESACTIVO") + "\n");
+            writer.write("Total downloads: " + totalDownloads + "\n\n");
+            writer.write("HISTORIAL DE DESCARGAS:\n");
+            writer.write("FECHA(YYYY-MM-DD) | DOWNLOAD ID | GAME CODE | GAME NAME                | PRICE    | GENRE\n");
+            
+            for (String record : downloadHistoryLines) {
+                writer.write(record + "\n");
+            }
+        }
+        return true;
     }
 
-    public static Steam getINSTANCE() {
-        return INSTANCE;
+    public ArrayList<Object[]> printGames() throws IOException {
+        ArrayList<Object[]> gamesList = new ArrayList<>();
+        rgames.seek(0);
+        while (rgames.getFilePointer() < rgames.length()) {
+            int code = rgames.readInt();
+            String titulo = rgames.readUTF();
+            String genero = rgames.readUTF();
+            char osChar = rgames.readChar();
+            int edad = rgames.readInt();
+            double precio = rgames.readDouble();
+            int downloads = rgames.readInt();
+            rgames.readUTF(); // path
+
+            String os = "";
+            switch (osChar) {
+                case 'W': os = "Windows"; break;
+                case 'M': os = "Mac"; break;
+                case 'L': os = "Linux"; break;
+            }
+            
+            Object[] row = {code, titulo, genero, os, edad, precio, downloads};
+            gamesList.add(row);
+        }
+        return gamesList;
     }
-}
-
-
-//reporte se guarde en listas enlazadas
+    
+    private String getGameGenre(int gameCode) throws IOException {
+        long originalPos = rgames.getFilePointer(); // Guardar posición actual
+        rgames.seek(0);
+        while (rgames.getFilePointer() < rgames.length()) {
+            int code = rgames.readInt();
+            rgames.readUTF(); // titulo
+            String genre = rgames.readUTF();
+            if (code == gameCode) {
+                rgames.seek(originalPos); // Restaurar posición
+                return genre;
+            }
+            rgames.readChar();
+            rgames.readInt();
+            rgames.readDouble();
+            rgames.readInt();
+            rgames.readUTF();
+        }
+        rgames.seek(originalPos); // Restaurar posición si no se encuentra
+        return "Desconocido";
+    }
+}   

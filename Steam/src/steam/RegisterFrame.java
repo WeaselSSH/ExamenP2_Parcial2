@@ -8,10 +8,13 @@ import com.toedter.calendar.JDateChooser;
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.util.Date;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 
 /**
  *
@@ -19,10 +22,17 @@ import java.awt.image.BufferedImage;
  */
 public class RegisterFrame extends JFrame {
 
+    private LoginFrame loginFrame;
     private JTextField photoPathField;
     private JLabel imagePreviewLabel;
+    private JTextField userText;
+    private JPasswordField passwordText;
+    private JTextField nameText;
+    private JDateChooser birthDateChooser;
+    private JComboBox<String> typeComboBox;
 
-    public RegisterFrame() {
+    public RegisterFrame(LoginFrame loginFrame) {
+        this.loginFrame = loginFrame;
         setTitle("Registro de Nuevo Usuario");
         setSize(550, 450);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
@@ -34,18 +44,14 @@ public class RegisterFrame extends JFrame {
         JPanel formPanel = new JPanel(new GridLayout(6, 2, 10, 10));
 
         JLabel userLabel = new JLabel("Username:");
-        JTextField userText = new JTextField();
-
+        userText = new JTextField();
         JLabel passwordLabel = new JLabel("Password:");
-        JPasswordField passwordText = new JPasswordField();
-
+        passwordText = new JPasswordField();
         JLabel nameLabel = new JLabel("Nombre Completo:");
-        JTextField nameText = new JTextField();
-
+        nameText = new JTextField();
         JLabel birthLabel = new JLabel("Fecha Nacimiento:");
-        JDateChooser birthDateChooser = new JDateChooser();
+        birthDateChooser = new JDateChooser();
         birthDateChooser.setDateFormatString("yyyy-MM-dd");
-
         JLabel photoLabel = new JLabel("Foto de Perfil:");
         JPanel photoSelectorPanel = new JPanel(new BorderLayout(5, 0));
         photoPathField = new JTextField();
@@ -53,11 +59,9 @@ public class RegisterFrame extends JFrame {
         JButton selectPhotoButton = new JButton("Seleccionar...");
         photoSelectorPanel.add(photoPathField, BorderLayout.CENTER);
         photoSelectorPanel.add(selectPhotoButton, BorderLayout.EAST);
-
         JLabel typeLabel = new JLabel("Tipo de Usuario:");
         String[] userTypes = {"NORMAL", "ADMIN"};
-        JComboBox<String> typeComboBox = new JComboBox<>(userTypes);
-
+        typeComboBox = new JComboBox<>(userTypes);
         formPanel.add(userLabel);
         formPanel.add(userText);
         formPanel.add(passwordLabel);
@@ -72,35 +76,36 @@ public class RegisterFrame extends JFrame {
         formPanel.add(typeComboBox);
 
         JPanel imagePreviewPanel = new JPanel(new BorderLayout());
-        imagePreviewPanel.setBorder(BorderFactory.createTitledBorder("Previsualización de Foto"));
+        imagePreviewPanel.setBorder(BorderFactory.createTitledBorder("Previsualizacion de Foto"));
         imagePreviewLabel = new JLabel();
         imagePreviewLabel.setHorizontalAlignment(SwingConstants.CENTER);
         imagePreviewLabel.setVerticalAlignment(SwingConstants.CENTER);
         imagePreviewPanel.add(imagePreviewLabel, BorderLayout.CENTER);
-
         JPanel buttonPanel = new JPanel();
         JButton registerButton = new JButton("Registrar");
         JButton cancelButton = new JButton("Cancelar");
         buttonPanel.add(registerButton);
         buttonPanel.add(cancelButton);
-
         JPanel bottomPanel = new JPanel(new GridLayout(1, 2, 10, 0));
         bottomPanel.add(imagePreviewPanel);
         bottomPanel.add(buttonPanel);
-
         mainContentPanel.add(formPanel, BorderLayout.NORTH);
         mainContentPanel.add(bottomPanel, BorderLayout.CENTER);
-
         add(mainContentPanel);
+
+        this.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                loginFrame.setVisible(true);
+            }
+        });
 
         selectPhotoButton.addActionListener(e -> {
             JFileChooser fileChooser = new JFileChooser();
             fileChooser.setDialogTitle("Seleccione una imagen de perfil");
-            FileNameExtensionFilter filter = new FileNameExtensionFilter("Imágenes (JPG, PNG, GIF)", "jpg", "png", "gif");
+            FileNameExtensionFilter filter = new FileNameExtensionFilter("Imagenes (JPG, PNG, GIF)", "jpg", "png", "gif");
             fileChooser.setFileFilter(filter);
-
             int result = fileChooser.showOpenDialog(this);
-
             if (result == JFileChooser.APPROVE_OPTION) {
                 File selectedFile = fileChooser.getSelectedFile();
                 photoPathField.setText(selectedFile.getAbsolutePath());
@@ -108,13 +113,43 @@ public class RegisterFrame extends JFrame {
             }
         });
 
-        registerButton.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "Lógica de registro no implementada.");
-        });
+        registerButton.addActionListener(e -> registerUser());
 
         cancelButton.addActionListener(e -> {
+            loginFrame.setVisible(true);
             this.dispose();
         });
+    }
+
+    private void registerUser() {
+        try {
+            String username = userText.getText();
+            String password = new String(passwordText.getPassword());
+            String fullName = nameText.getText();
+            Date birthDate = birthDateChooser.getDate();
+            String photoPath = photoPathField.getText();
+            String userType = (String) typeComboBox.getSelectedItem();
+
+            if (username.isEmpty() || password.isEmpty() || fullName.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Por favor, llene todos los campos de texto.", "Campos Vacios", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            if (birthDate == null) {
+                JOptionPane.showMessageDialog(this, "Por favor, seleccione una fecha de nacimiento.", "Fecha Faltante", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            long birthMillis = birthDate.getTime();
+            Steam.getINSTANCE().addPlayer(username, password, fullName, birthMillis, photoPath, userType);
+            JOptionPane.showMessageDialog(this, "Usuario registrado exitosamente.", "Exito", JOptionPane.INFORMATION_MESSAGE);
+            loginFrame.setVisible(true);
+            this.dispose();
+
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this, "Error al guardar el usuario en el archivo: " + ex.getMessage(), "Error de Archivo", JOptionPane.ERROR_MESSAGE);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Ocurrio un error inesperado: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private void displayImagePreview(File file) {
@@ -122,19 +157,15 @@ public class RegisterFrame extends JFrame {
             BufferedImage originalImage = ImageIO.read(file);
             if (originalImage == null) {
                 imagePreviewLabel.setIcon(null);
-                imagePreviewLabel.setText("No es una imagen válida");
+                imagePreviewLabel.setText("No es una imagen valida");
                 return;
             }
-
             int labelWidth = 150;
             int labelHeight = 150;
-
             Image scaledImage = originalImage.getScaledInstance(labelWidth, labelHeight, Image.SCALE_SMOOTH);
             ImageIcon imageIcon = new ImageIcon(scaledImage);
-
             imagePreviewLabel.setText("");
             imagePreviewLabel.setIcon(imageIcon);
-
         } catch (Exception ex) {
             imagePreviewLabel.setIcon(null);
             imagePreviewLabel.setText("Error al cargar imagen");

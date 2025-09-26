@@ -4,16 +4,19 @@
  */
 package steam;
 
+import javax.swing.SwingUtilities;
+
 /**
  *
  * @author saidn
  */
 public class Main {
-    
     public static void main(String[] args) {
-        RegisterFrame reg = new RegisterFrame();
-        LoginFrame log = new LoginFrame();
         
-        reg.setVisible(true);
+        SwingUtilities.invokeLater(() -> {
+
+            LoginFrame loginFrame = new LoginFrame();
+            loginFrame.setVisible(true);
+        });
     }
 }

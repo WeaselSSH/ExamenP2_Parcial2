@@ -6,8 +6,7 @@ package steam;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import java.io.IOException;
 
 /**
  *
@@ -15,19 +14,22 @@ import java.awt.event.ActionListener;
  */
 public class LoginFrame extends JFrame {
 
+    private JTextField userText;
+    private JPasswordField passwordText;
+
     public LoginFrame() {
         setTitle("Steam Login");
         setSize(400, 200);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLocationRelativeTo(null); 
+        setLocationRelativeTo(null);
 
         JPanel panel = new JPanel(new GridLayout(3, 2, 10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         JLabel userLabel = new JLabel("Username:");
-        JTextField userText = new JTextField();
+        userText = new JTextField();
         JLabel passwordLabel = new JLabel("Password:");
-        JPasswordField passwordText = new JPasswordField();
+        passwordText = new JPasswordField();
         JButton loginButton = new JButton("Entrar");
         JButton registerButton = new JButton("Registrar Usuario");
 
@@ -40,19 +42,48 @@ public class LoginFrame extends JFrame {
 
         add(panel);
 
-        loginButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                JOptionPane.showMessageDialog(null, "Lógica de login no implementada.");
-            }
-        });
+        loginButton.addActionListener(e -> attemptLogin());
 
-        registerButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                RegisterFrame registerWindow = new RegisterFrame();
-                registerWindow.setVisible(true);
-            }
+        registerButton.addActionListener(e -> {
+            this.setVisible(false);
+            RegisterFrame registerWindow = new RegisterFrame(this);
+            registerWindow.setVisible(true);
         });
+    }
+
+    private void attemptLogin() {
+        String username = userText.getText();
+        String password = new String(passwordText.getPassword());
+
+        if (username.isEmpty() || password.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "El usuario y la contrasena no pueden estar vacios.", "Error", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        try {
+            String userType = Steam.getINSTANCE().login(username, password);
+
+            if (userType != null) {
+                switch (userType) {
+                    case "ADMIN":
+                        AdminFrame adminWindow = new AdminFrame(this);
+                        adminWindow.setVisible(true);
+                        this.dispose();
+                        break;
+                    case "NORMAL":
+                        UserFrame userWindow = new UserFrame(this);
+                        userWindow.setVisible(true);
+                        this.dispose();
+                        break;
+                    case "INACTIVE":
+                        JOptionPane.showMessageDialog(this, "Esta cuenta ha sido desactivada.", "Login Fallido", JOptionPane.ERROR_MESSAGE);
+                        break;
+                }
+            } else {
+                JOptionPane.showMessageDialog(this, "Usuario o contrasena incorrectos.", "Login Fallido", JOptionPane.ERROR_MESSAGE);
+            }
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this, "Error al leer el archivo de usuarios: " + ex.getMessage(), "Error de Archivo", JOptionPane.ERROR_MESSAGE);
+        }
     }
 }

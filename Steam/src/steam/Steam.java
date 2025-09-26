@@ -291,6 +291,28 @@ public class Steam {
         }
         return false;
     }
+    
+     public record Player(int code, String username, String password, String fullName, long birthDate, int downloads, String photoPath, String userType, boolean isActive) {}
+
+    public Player getPlayerByUsername(String username) throws IOException {
+        rplayer.seek(0);
+        while (rplayer.getFilePointer() < rplayer.length()) {
+            int code = rplayer.readInt();
+            String fileUsername = rplayer.readUTF();
+            String filePassword = rplayer.readUTF();
+            String nombre = rplayer.readUTF();
+            long nacimiento = rplayer.readLong();
+            int contDescargas = rplayer.readInt();
+            String imgPath = rplayer.readUTF();
+            String tipoUsuario = rplayer.readUTF();
+            boolean estado = rplayer.readBoolean();
+            if (fileUsername.equals(username)) {
+                return new Player(code, fileUsername, filePassword, nombre, nacimiento, contDescargas, imgPath, tipoUsuario, estado);
+            }
+        }
+        return null;
+    }
+
 
     public static Steam getINSTANCE() {
         return INSTANCE;

@@ -260,14 +260,36 @@ public class Steam {
             long nacimiento = rplayer.readLong();
             int contDescargas = rplayer.readInt();
             String imgPath = rplayer.readUTF();
-            String tipoUsuario = rplayer.readUTF();   // "ADMIN" | "NORMAL"
+            String tipoUsuario = rplayer.readUTF();
             boolean estado = rplayer.readBoolean();
 
             if (fileUsername.equals(username) && filePassword.equals(password)) {
                 return estado ? tipoUsuario : "INACTIVE";
             }
         }
-        return null; // no coincide
+        return null;
+    }
+
+    public boolean updatePriceFor(int codeGame, double newPrice) throws IOException {
+        rgames.seek(0);
+        while (rgames.getFilePointer() < rgames.length()) {
+            int code = rgames.readInt();
+            rgames.readUTF();
+            rgames.readUTF();
+            rgames.readChar();
+            rgames.readInt();
+            long pricePos = rgames.getFilePointer();
+            rgames.readDouble();
+            rgames.readInt();
+            rgames.readUTF();
+
+            if (code == codeGame) {
+                rgames.seek(pricePos);
+                rgames.writeDouble(newPrice);
+                return true;
+            }
+        }
+        return false;
     }
 
     public static Steam getINSTANCE() {

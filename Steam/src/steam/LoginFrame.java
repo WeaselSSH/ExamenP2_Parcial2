@@ -19,7 +19,7 @@ public class LoginFrame extends JFrame {
         setTitle("Steam Login");
         setSize(400, 200);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLocationRelativeTo(null);
+        setLocationRelativeTo(null); 
 
         JPanel panel = new JPanel(new GridLayout(3, 2, 10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -37,23 +37,22 @@ public class LoginFrame extends JFrame {
         panel.add(passwordText);
         panel.add(loginButton);
         panel.add(registerButton);
-        
+
         add(panel);
-        
-        loginButton.addActionListener(new ActionListener(){
+
+        loginButton.addActionListener(new ActionListener() {
             @Override
-            public void actionPerformed(ActionEvent e){
-            JOptionPane.showMessageDialog(null, "Login Correcto");
+            public void actionPerformed(ActionEvent e) {
+                JOptionPane.showMessageDialog(null, "Lógica de login no implementada.");
             }
         });
-        
-        registerButton.addActionListener(new ActionListener(){
-            public void actionPerformed(ActionEvent e){
-            JOptionPane.showMessageDialog(null, "Login Correcto");
+
+        registerButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                RegisterFrame registerWindow = new RegisterFrame();
+                registerWindow.setVisible(true);
             }
         });
     }
- 
-    
-
 }
